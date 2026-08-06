@@ -1,0 +1,46 @@
+# LocalAI Agent Router — 用户自定义路由规则
+# 规则按顺序匹配，命中即停止。model 字段对应 models.yaml 中的 name。
+
+rules:
+  - name: "编程问题"
+    keywords:
+      - "C++"
+      - "算法"
+      - "debug"
+      - "ACM"
+      - "LeetCode"
+      - "代码"
+      - "编程"
+      - "函数"
+      - "bug"
+      - "编译"
+    model: "deepseek"
+
+  - name: "论文分析"
+    keywords:
+      - "PDF"
+      - "论文"
+      - "总结"
+      - "abstract"
+      - "文献"
+      - "综述"
+    model: "kimi"
+
+  - name: "翻译任务"
+    keywords:
+      - "翻译"
+      - "translate"
+      - "英文"
+      - "中文"
+      - "中英"
+    model: "qwen"
+
+  - name: "数学问题"
+    keywords:
+      - "数学"
+      - "微积分"
+      - "线性代数"
+      - "概率"
+      - "证明"
+      - "计算"
+    model: "deepseek"

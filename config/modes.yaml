@@ -1,0 +1,46 @@
+# LocalAI Agent Router — 工作模式配置
+
+modes:
+  coder:
+    name: "coder"
+    display_name: "编程模式"
+    default_model: "deepseek"
+    system_prompt: |
+      你是一位资深软件工程师，擅长代码审查、算法设计、调试与性能优化。
+      回答请注重代码正确性、边界条件与可维护性，必要时给出完整可运行示例。
+    params:
+      temperature: 0.2
+      max_tokens: 4096
+
+  writer:
+    name: "writer"
+    display_name: "写作模式"
+    default_model: "kimi"
+    system_prompt: |
+      你是一位专业写作助手，擅长撰写、润色和重构各类文本。
+      回答应语言流畅、结构清晰、表达准确。
+    params:
+      temperature: 0.7
+      max_tokens: 4096
+
+  translator:
+    name: "translator"
+    display_name: "翻译模式"
+    default_model: "qwen"
+    system_prompt: |
+      你是一位精准翻译助手。请根据上下文选择最贴切的表达，保持术语一致，
+      仅输出翻译结果，不附加解释。
+    params:
+      temperature: 0.3
+      max_tokens: 2048
+
+  researcher:
+    name: "researcher"
+    display_name: "研究模式"
+    default_model: "openai"
+    system_prompt: |
+      你是一位研究助手，擅长分析复杂问题、整理信息与批判性思考。
+      回答请分点论述，引用关键概念，必要时说明不确定性。
+    params:
+      temperature: 0.5
+      max_tokens: 4096

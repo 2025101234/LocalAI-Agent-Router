@@ -1,0 +1,72 @@
+# LocalAI Agent Router — 模型配置示例
+# 请通过 CLI 命令 `/model add` 录入真实 API Key，切勿在此文件填写明文密钥。
+
+settings:
+  default_model: "deepseek"
+  fallback_chain:
+    - "deepseek"
+    - "qwen"
+    - "openai"
+
+models:
+  - name: "deepseek"
+    provider: "deepseek"
+    base_url: "https://api.deepseek.com"
+    model: "deepseek-v4-flash"
+    api_key_encrypted: ""
+    enabled: true
+    capabilities:
+      - "coding"
+      - "math"
+      - "writing"
+      - "document"
+    priority: 10
+    cost_per_1k_input: 0.00014
+    cost_per_1k_output: 0.00028
+
+  - name: "openai"
+    provider: "openai"
+    base_url: "https://api.openai.com/v1"
+    model: "gpt-4o-mini"
+    api_key_encrypted: ""
+    enabled: true
+    capabilities:
+      - "coding"
+      - "writing"
+      - "translation"
+      - "document"
+    priority: 30
+    # 请按账户当前价格填写；0 表示不估算费用。
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+
+  - name: "kimi"
+    provider: "kimi"
+    base_url: "https://api.moonshot.cn/v1"
+    model: "kimi-k3"
+    api_key_encrypted: ""
+    enabled: true
+    capabilities:
+      - "document"
+      - "writing"
+      - "translation"
+    priority: 20
+    # 价格随服务套餐变化，默认不做可能失真的本地估价。
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0
+
+  - name: "qwen"
+    provider: "qwen"
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    model: "qwen-plus"
+    api_key_encrypted: ""
+    enabled: true
+    capabilities:
+      - "coding"
+      - "math"
+      - "translation"
+      - "writing"
+    priority: 20
+    # 请按地域和账户当前价格填写；0 表示不估算费用。
+    cost_per_1k_input: 0.0
+    cost_per_1k_output: 0.0

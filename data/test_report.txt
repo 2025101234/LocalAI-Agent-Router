@@ -1,0 +1,45 @@
+LocalAI Agent Router - Final Verification Report
+================================================
+Date: 2026-08-06
+Platform: Windows / PowerShell (Python 3.12.3)
+
+Automated tests:
+  python -m pytest -q (with production coverage targets)
+  75 passed in 45.29s
+  Includes a real 127.0.0.1 HTTP socket streaming end-to-end test.
+
+Coverage verification:
+  python -m pytest -q --cov=agent --cov=cli --cov=models --cov=providers
+    --cov=storage --cov=main --cov-report=term
+  87% production-code coverage (1551 statements, 208 missed)
+
+Static and security verification:
+  Ruff: all checks passed
+  Bandit 1.9.4: no issues found
+  pip-audit 2.10.1: no known vulnerabilities found
+  pip check: no broken requirements found
+  Source secret pattern scan: no embedded credentials found
+
+Package verification:
+  Wheel: dist/localai_agent_router-0.1.0-py3-none-any.whl
+  SHA256: 57574D036D694F1ED95A9A8E303DBB9A7B65F52CCA4327A42F81DC00574C9907
+  Isolated wheel install: passed
+  localai version: passed
+  python -m localai_agent_router version: passed
+  Installed interactive /model list -> /help -> /exit flow: passed
+  Installed user-data directory creation: passed
+  Installed current model templates: passed
+
+Linux post-fix verification:
+  Image: python:3.12-alpine
+  Wheel install and localai version: passed
+  Interactive /model list -> /exit flow: passed
+  User-data directory creation: passed
+  POSIX data directory permission: 0700
+  POSIX database and models.yaml permissions: 0600
+  Test container was removed automatically; Docker Desktop was returned to stopped state.
+
+Notes:
+  - Third-party Provider requests are mocked; the end-to-end acceptance test uses a
+    real local HTTP socket and a synthetic key.
+  - No live third-party model request was made because no user credential was supplied.
