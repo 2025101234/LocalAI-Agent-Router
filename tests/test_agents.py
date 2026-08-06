@@ -453,3 +453,23 @@ def test_manager_temporarily_skips_agent_after_auth_failure(
     assert "403" in statuses["claude"]["detail"]
     assert selected is not None and selected.runtime_name == "codex"
     assert "自动交接" in reason
+
+
+def test_manager_surfaces_claude_upstream_timeout(
+    temp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_agent_project(temp_dir)
+    monkeypatch.setattr(
+        AgentManager,
+        "RUNTIMES",
+        {"codex": _FakeAgentRuntime, "claude": _FakeAgentRuntime},
+    )
+    manager = AgentManager(temp_dir / "config" / "agents.yaml", temp_dir)
+    claude = manager.runtime("claude")
+    assert claude is not None
+
+    manager.record_failure(claude, AgentError("Claude Agent 运行超过 180 秒，已停止"))
+
+    status = {item["name"]: item for item in manager.statuses()}["claude"]
+    assert status["ready"] is False
+    assert "连接超时" in status["detail"]

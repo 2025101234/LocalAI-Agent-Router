@@ -61,7 +61,7 @@ localai
 先在联网机器下载仓库 Releases 中的 `.whl` 文件和依赖，再复制到目标机器：
 
 ```bash
-python -m pip install localai_agent_router-0.3.1-py3-none-any.whl
+python -m pip install localai_agent_router-0.3.2-py3-none-any.whl
 localai version
 ```
 

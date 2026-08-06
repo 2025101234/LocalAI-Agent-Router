@@ -93,6 +93,12 @@ class AgentManager:
             )
         elif "not logged in" in message or "未登录" in message:
             detail = f"{runtime.config.display_name} 未登录，请先完成登录"
+        elif runtime.runtime_name == "claude" and (
+            "超过" in message or "timed out" in message or "timeout" in message
+        ):
+            detail = (
+                "Claude 上游连接超时，请检查供应商地址、网络或 CC Switch 代理设置"
+            )
         else:
             detail = f"{runtime.config.display_name} 上次运行失败，将在 60 秒后自动重试"
         self._runtime_failures[runtime.runtime_name] = (time.monotonic() + 60, detail)
