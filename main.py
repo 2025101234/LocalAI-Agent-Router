@@ -40,7 +40,7 @@ def resolve_project_dir(project_dir: Path | None = None) -> Path:
     secure_directory(config_dir)
 
     templates_dir = source_dir / "config"
-    for filename in ("models.yaml", "rules.yaml", "modes.yaml"):
+    for filename in ("models.yaml", "rules.yaml", "modes.yaml", "agents.yaml"):
         destination = config_dir / filename
         if not destination.exists():
             shutil.copy2(templates_dir / filename, destination)
@@ -106,7 +106,7 @@ def gui(
 @app.command()
 def version() -> None:
     """显示版本信息。"""
-    typer.echo("LocalAI Agent Router 0.2.0")
+    typer.echo("LocalAI Agent Router 0.3.0")
 
 
 def main() -> None:

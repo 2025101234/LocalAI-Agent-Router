@@ -1,0 +1,38 @@
+# LocalAI Agent Router — 本地 Agent 网关配置
+# command 只接受可执行文件名或绝对路径，不通过 shell 执行。
+
+settings:
+  default_target: "auto"
+  fallback_to_models: true
+  routing:
+    coding: "codex"
+    math: "codex"
+    writing: "claude"
+    document: "claude"
+    translation: "claude"
+    research: "claude"
+    general: "claude"
+
+agents:
+  codex:
+    display_name: "Codex Agent"
+    command: "codex"
+    enabled: true
+    model: ""
+    capabilities: ["coding", "math"]
+    priority: 10
+    permission_mode: "workspace-write"
+    safe_mode: true
+    timeout_seconds: 180
+
+  claude:
+    display_name: "Claude Agent"
+    command: "claude"
+    enabled: true
+    model: "sonnet"
+    capabilities: ["writing", "document", "translation", "research", "general"]
+    priority: 20
+    permission_mode: "acceptEdits"
+    safe_mode: true
+    max_turns: 25
+    timeout_seconds: 180

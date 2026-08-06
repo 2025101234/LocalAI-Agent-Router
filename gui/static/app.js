@@ -4,8 +4,9 @@ const initialParams = new URLSearchParams(location.search);
 const state = {
   token: initialParams.get("token") || "",
   initialView: initialParams.get("view") || "chat",
-  models: [], modes: [], sessions: [], stats: null, monthlyStats: null,
+  models: [], modes: [], agents: [], sessions: [], stats: null, monthlyStats: null,
   currentMode: "coder", currentSessionId: null, forcedModel: null,
+  forcedAgent: "auto",
   vaultStatus: "uninitialized", attachments: [], sending: false,
   pendingModel: null, statsPeriod: "daily", selectedHistory: null,
 };
@@ -87,6 +88,17 @@ function renderSelectors() {
     `<option value="${escapeHtml(model.name)}" ${model.name === state.forcedModel ? "selected" : ""}>${escapeHtml(model.name)}</option>`
   ));
   $("#model-select").innerHTML = modelOptions.join("");
+  const agentOptions = [
+    `<option value="auto">自动 Agent</option>`,
+    `<option value="model">普通模型路由</option>`,
+  ].concat(state.agents.map(agent =>
+    `<option value="${escapeHtml(agent.name)}" ${agent.available && agent.enabled ? "" : "disabled"}>${escapeHtml(agent.display_name)}${agent.available ? "（已安装）" : "（未安装）"}</option>`
+  ));
+  $("#agent-select").innerHTML = agentOptions.join("");
+  $("#agent-select").value = state.forcedAgent || "auto";
+  $("#agent-status-bar").innerHTML = state.agents.map(agent => `
+    <span class="agent-pill ${agent.ready && agent.enabled ? "ready" : ""} ${state.forcedAgent === agent.name ? "current" : ""}" title="${escapeHtml(agent.detail || "")}"><i></i>${escapeHtml(agent.display_name)} · ${escapeHtml(agent.model || "默认模型")}</span>
+  `).join("");
 }
 
 function renderRecent() {
@@ -191,7 +203,8 @@ async function sendMessage() {
   const text = input.value.trim();
   if (state.sending || (!text && !state.attachments.length)) return;
   state.sending = true;
-  $("#send-btn").disabled = true;
+  $("#send-btn").disabled = false;
+  $("#send-btn span").textContent = "停止";
   addMessage("user", text || `已上传 ${state.attachments.length} 个附件`);
   const assistant = addMessage("assistant", "", "正在路由", true);
   const contentNode = $(".message-content", assistant);
@@ -215,9 +228,11 @@ async function sendMessage() {
       for (const line of lines) {
         if (!line.trim()) continue;
         const event = JSON.parse(line);
-        if (event.type === "meta") { badge.textContent = `${event.model} · ${event.tag}`; contentNode.innerHTML = ""; }
+        if (event.type === "meta") { badge.textContent = `${event.model} · ${event.tag}${event.reason ? ` · ${event.reason}` : ""}`; contentNode.innerHTML = ""; }
         if (event.type === "chunk") { answer += event.content; contentNode.innerHTML = renderMarkdown(answer); scrollChat(); }
         if (event.type === "status") { badge.textContent = event.content; }
+        if (event.type === "activity") { badge.textContent = `${event.agent} · ${event.activity}`; }
+        if (event.type === "reset") { answer = ""; contentNode.innerHTML = ""; }
         if (event.type === "done") {
           badge.textContent = event.model;
           state.stats = event.stats; state.sessions = event.sessions;
@@ -233,7 +248,8 @@ async function sendMessage() {
     toast(error.message, "error");
     if (/主密码|解密|密钥库/.test(error.message)) openVault(state.vaultStatus === "uninitialized");
   } finally {
-    state.sending = false; $("#send-btn").disabled = false; input.focus();
+    state.sending = false; $("#send-btn").disabled = false;
+    $("#send-btn span").textContent = "发送"; input.focus();
   }
 }
 
@@ -387,10 +403,10 @@ async function refreshBootstrap() {
   try {
     const response = await api("/api/bootstrap"); const data = await response.json();
     Object.assign(state, {
-      models: data.models, modes: data.modes, sessions: data.sessions,
+      models: data.models, modes: data.modes, agents: data.agents || [], sessions: data.sessions,
       stats: data.stats, monthlyStats: data.monthly_stats,
       currentMode: data.current_mode, currentSessionId: data.current_session_id,
-      forcedModel: data.forced_model, vaultStatus: data.vault_status,
+      forcedModel: data.forced_model, forcedAgent: data.forced_agent || "auto", vaultStatus: data.vault_status,
     });
     renderSelectors(); renderRecent(); renderModels(); renderStats();
     if (state.vaultStatus === "locked") openVault(false);
@@ -416,7 +432,22 @@ function bindEvents() {
     try { await post("/api/model/force", { name: event.target.value || null }); state.forcedModel = event.target.value || null; toast(state.forcedModel ? `已固定使用 ${state.forcedModel}` : "已恢复自动路由"); }
     catch (error) { toast(error.message, "error"); renderSelectors(); }
   });
-  $("#send-btn").addEventListener("click", sendMessage);
+  $("#agent-select").addEventListener("change", async event => {
+    try {
+      const result = await post("/api/agent/target", { name: event.target.value });
+      state.forcedAgent = result.name; renderSelectors();
+      toast(state.forcedAgent === "auto" ? "已启用 Agent 场景自动路由" : `已切换到 ${event.target.options[event.target.selectedIndex].text}`);
+    } catch (error) { toast(error.message, "error"); renderSelectors(); }
+  });
+  $("#send-btn").addEventListener("click", async () => {
+    if (!state.sending) { sendMessage(); return; }
+    try {
+      const result = await post("/api/agent/cancel");
+      if (result.cancelled) $("#send-btn").disabled = true;
+      else toast("当前请求尚未进入可停止的 Agent", "error");
+    }
+    catch (error) { toast(error.message, "error"); }
+  });
   $("#message-input").addEventListener("input", autoResize);
   $("#message-input").addEventListener("keydown", event => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(); } });
   $("#attach-btn").addEventListener("click", () => $("#file-input").click());

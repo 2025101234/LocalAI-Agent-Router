@@ -213,6 +213,11 @@ class GuiRequestHandler(BaseHTTPRequestHandler):
             name = payload.get("name")
             service.force_model(str(name) if name else None)
             return {"name": service.router.get_forced_model()}
+        if path == "/api/agent/target":
+            service.set_agent_target(str(payload.get("name") or "auto"))
+            return {"name": service.forced_agent}
+        if path == "/api/agent/cancel":
+            return {"cancelled": service.cancel_agent()}
         if path == "/api/model/save":
             return service.save_model(payload)
         if path == "/api/model/delete":

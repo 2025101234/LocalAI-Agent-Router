@@ -11,7 +11,7 @@ from loguru import logger
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session as DbSession
 
-from storage.database import Message, Session, TokenUsage, utc_now
+from storage.database import AgentThread, Message, Session, TokenUsage, utc_now
 from storage.permissions import atomic_write_text
 
 
@@ -106,6 +106,45 @@ class ConversationHistory:
             .order_by(Message.created_at.asc())
             .all()
         )
+
+    def get_agent_thread(self, session_id: str, runtime: str) -> AgentThread | None:
+        return (
+            self.db.query(AgentThread)
+            .filter(
+                AgentThread.session_id == session_id,
+                AgentThread.runtime == runtime,
+            )
+            .first()
+        )
+
+    def save_agent_thread(
+        self,
+        session_id: str,
+        runtime: str,
+        remote_session_id: str,
+        model: str,
+        last_message_id: int,
+    ) -> AgentThread:
+        thread = self.get_agent_thread(session_id, runtime)
+        if thread is None:
+            thread = AgentThread(
+                session_id=session_id,
+                runtime=runtime,
+                remote_session_id=remote_session_id,
+            )
+            self.db.add(thread)
+        thread.remote_session_id = remote_session_id
+        thread.model = model
+        thread.last_message_id = last_message_id
+        thread.updated_at = utc_now()
+        self.db.commit()
+        return thread
+
+    def messages_after(self, session_id: str, message_id: int | None) -> list[Message]:
+        query = self.db.query(Message).filter(Message.session_id == session_id)
+        if message_id is not None:
+            query = query.filter(Message.id > message_id)
+        return query.order_by(Message.id.asc()).all()
 
     def record_usage(
         self,

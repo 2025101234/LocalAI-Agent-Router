@@ -1,14 +1,14 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=77.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "localai-agent-router"
-version = "0.2.0"
+version = "0.3.0"
 description = "A pure-local multi-model AI Agent router platform"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "LocalAI Team"}
 ]
@@ -16,7 +16,6 @@ keywords = ["ai", "agent", "router", "llm", "cli", "web-ui"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
 ]
@@ -50,7 +49,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["agent*", "cli*", "config*", "gui*", "localai_agent_router*", "models*", "providers*", "storage*"]
+include = ["agent*", "agents*", "cli*", "config*", "gui*", "localai_agent_router*", "models*", "providers*", "storage*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]

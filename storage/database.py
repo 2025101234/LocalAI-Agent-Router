@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
     event,
 )
@@ -45,6 +46,9 @@ class Session(Base):
 
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
     usages = relationship("TokenUsage", back_populates="session", cascade="all, delete-orphan")
+    agent_threads = relationship(
+        "AgentThread", back_populates="session", cascade="all, delete-orphan"
+    )
 
 
 class Message(Base):
@@ -76,6 +80,23 @@ class TokenUsage(Base):
     created_at = Column(DateTime, default=utc_now, nullable=False, index=True)
 
     session = relationship("Session", back_populates="usages")
+
+
+class AgentThread(Base):
+    """LocalAI 会话与外部 Agent 可恢复线程的映射。"""
+
+    __tablename__ = "agent_threads"
+    __table_args__ = (UniqueConstraint("session_id", "runtime", name="uq_agent_thread"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(String(64), ForeignKey("sessions.id"), nullable=False, index=True)
+    runtime = Column(String(32), nullable=False)
+    remote_session_id = Column(String(128), nullable=False)
+    model = Column(String(128), nullable=True)
+    last_message_id = Column(Integer, nullable=True)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    session = relationship("Session", back_populates="agent_threads")
 
 
 class Database:

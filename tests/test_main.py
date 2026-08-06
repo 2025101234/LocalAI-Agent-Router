@@ -18,6 +18,7 @@ def test_explicit_project_directory(temp_dir: Path) -> None:
 
     assert main.resolve_project_dir(selected) == selected.resolve()
     assert {path.name for path in (selected / "config").iterdir()} == {
+        "agents.yaml",
         "models.yaml",
         "modes.yaml",
         "rules.yaml",
@@ -30,7 +31,7 @@ def test_installed_layout_copies_config_templates(
     source_dir = temp_dir / "site-packages"
     templates = source_dir / "config"
     templates.mkdir(parents=True)
-    for filename in ("models.yaml", "rules.yaml", "modes.yaml"):
+    for filename in ("models.yaml", "rules.yaml", "modes.yaml", "agents.yaml"):
         (templates / filename).write_text(f"# {filename}\n", encoding="utf-8")
 
     user_data = temp_dir / "user-data"

@@ -6,7 +6,7 @@ LocalAI Agent Router 是本地交互程序，不需要公网 Web 服务器、反
 
 - Python 3.12 或更高版本
 - Windows 10/11、主流 Linux 发行版或 macOS
-- 至少一个 OpenAI Chat Completions 兼容模型服务及其 API Key
+- 至少满足一项：已登录的 Codex CLI、已登录的 Claude Code，或一个 OpenAI Chat Completions 兼容模型服务
 
 ## 2. 推荐部署：pipx
 
@@ -61,7 +61,7 @@ localai
 先在联网机器下载仓库 Releases 中的 `.whl` 文件和依赖，再复制到目标机器：
 
 ```bash
-python -m pip install localai_agent_router-0.1.0-py3-none-any.whl
+python -m pip install localai_agent_router-0.3.0-py3-none-any.whl
 localai version
 ```
 
@@ -80,6 +80,19 @@ localai gui
 ```
 
 在“模型管理”中编辑内置模型、录入 API Key 并点击“测试连接”。也可在终端界面更新一个内置模型：
+
+使用统一 Agent 网关时，先确认本机 CLI 已安装并登录：
+
+```bash
+codex --version
+codex login status
+claude --version
+claude auth status --json
+```
+
+启动界面后保持“Agent 网关 → 自动 Agent”。默认编程/数学进入 Codex，写作/文档/翻译/研究进入 Claude。详细路由、模型、超时和权限位于 `config/agents.yaml`。
+
+Agent 状态只在本机读取。若 Claude 显示本地代理未启动，请检查 `CLAUDE_CONFIG_DIR/settings.json` 中的 `ANTHROPIC_BASE_URL` 及对应监听端口；程序不会自动改写 Claude 的认证令牌或代理设置。
 
 ```text
 /model update deepseek
@@ -136,6 +149,8 @@ localai
 ```bash
 localai version
 localai gui --no-browser
+codex login status
+claude auth status --json
 ```
 
 进入程序后依次执行：

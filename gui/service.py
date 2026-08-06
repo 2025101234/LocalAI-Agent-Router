@@ -8,7 +8,7 @@ from collections.abc import Callable
 from dataclasses import asdict
 from datetime import UTC
 from pathlib import Path
-from threading import RLock
+from threading import Lock, RLock
 from typing import Any
 
 import yaml
@@ -18,6 +18,8 @@ from agent.analyzer import TaskAnalyzer
 from agent.memory import MemoryManager
 from agent.planner import ExecutionPlan, ExecutionPlanner
 from agent.router import Router
+from agents.base import AgentCancelled, AgentError, AgentResult, AgentRuntime
+from agents.manager import AgentManager
 from models.manager import ModelConfig, ModelManager
 from models.registry import ProviderRegistry
 from providers.base import ProviderError, RateLimitError
@@ -41,6 +43,8 @@ class ApplicationService:
         self.data_dir = project_dir / "data"
         self.config_dir = project_dir / "config"
         self.lock = RLock()
+        self._active_agent_lock = Lock()
+        self._active_agent: AgentRuntime | None = None
         self._log_sink_id = self._configure_logging()
         self.vault = SecureVault(self.data_dir)
         self.db = Database(self.data_dir / "localai.db")
@@ -51,6 +55,10 @@ class ApplicationService:
         self.analyzer = TaskAnalyzer(self.config_dir / "rules.yaml")
         self.planner = ExecutionPlanner(self._load_modes())
         self.router = Router(self.model_manager, self.registry, self.analyzer)
+        self.agent_manager = AgentManager(self.config_dir / "agents.yaml", project_dir)
+        self.forced_agent = str(
+            self.agent_manager.settings.get("default_target") or "auto"
+        )
         self.memory = MemoryManager()
         self.current_mode = "coder" if "coder" in self.planner.modes else next(
             iter(self.planner.modes), "default"
@@ -168,6 +176,8 @@ class ApplicationService:
                 "current_mode": self.current_mode,
                 "current_session_id": self.current_session_id,
                 "forced_model": self.router.get_forced_model(),
+                "agents": self.agent_manager.statuses(),
+                "forced_agent": self.forced_agent,
                 "vault_status": self.vault_status(),
             }
 
@@ -183,6 +193,22 @@ class ApplicationService:
             if name and self.model_manager.get_model(name) is None:
                 raise ValueError(f"未知模型: {name}")
             self.router.force_model(name)
+
+    def set_agent_target(self, name: str) -> None:
+        with self.lock:
+            target = name or "auto"
+            allowed = {"auto", "model", *self.agent_manager.configs}
+            if target not in allowed:
+                raise ValueError(f"未知 Agent 目标: {target}")
+            if target not in {"auto", "model"}:
+                runtime = self.agent_manager.runtime(target)
+                if runtime is None or not runtime.executable():
+                    raise ValueError(f"Agent {target} 未启用或命令不可用")
+            self.forced_agent = target
+
+    def cancel_agent(self) -> bool:
+        with self._active_agent_lock:
+            return bool(self._active_agent and self._active_agent.cancel())
 
     def new_session(self) -> dict[str, Any]:
         with self.lock:
@@ -317,7 +343,11 @@ class ApplicationService:
     ) -> None:
         if not text.strip() and not attachments:
             raise ValueError("请输入消息或添加附件")
-        with self.lock, tempfile.TemporaryDirectory(prefix="localai-gui-") as temp:
+        agent_temp_root = self.data_dir / "agent-tmp"
+        secure_directory(agent_temp_root)
+        with self.lock, tempfile.TemporaryDirectory(
+            prefix="localai-gui-", dir=agent_temp_root
+        ) as temp:
             paths = self._decode_attachments(attachments, Path(temp))
             plan = ExecutionPlan(
                 user_input=text.strip(),
@@ -327,6 +357,28 @@ class ApplicationService:
             )
             self.analyzer.reload()
             mode_config = self.planner.modes.get(self.current_mode, {})
+            analysis = self.analyzer.analyze(text)
+            tags = set(analysis["tags"])
+            if self.current_mode == "coder":
+                tags.add("coding")
+            elif self.current_mode == "researcher":
+                tags.add("research")
+            elif self.current_mode in {"writer", "translator"}:
+                tags.add("writing" if self.current_mode == "writer" else "translation")
+
+            runtime, route_reason = self.agent_manager.select(tags, self.forced_agent)
+            if runtime is not None:
+                completed = await self._chat_agent(
+                    runtime,
+                    route_reason,
+                    text.strip() or "请处理附件中的内容。",
+                    paths,
+                    analysis["primary_tag"],
+                    emit,
+                )
+                if completed:
+                    return
+
             provider = self.router.select_model(
                 text + " " + " ".join(path.name for path in paths),
                 mode_model=mode_config.get("default_model"),
@@ -338,7 +390,7 @@ class ApplicationService:
                 system_prompt=mode_config.get("system_prompt", ""),
                 history=self.memory.get_messages(),
             )
-            tag = self.analyzer.analyze(text)["primary_tag"]
+            tag = analysis["primary_tag"]
             emit({"type": "meta", "model": provider.name, "tag": tag})
             answer = ""
             used_model = provider.name
@@ -390,6 +442,163 @@ class ApplicationService:
                     "sessions": self.list_sessions(),
                 }
             )
+
+    async def _chat_agent(
+        self,
+        runtime: AgentRuntime,
+        route_reason: str,
+        text: str,
+        attachments: list[Path],
+        tag: str,
+        emit: EventCallback,
+    ) -> bool:
+        emit(
+            {
+                "type": "meta",
+                "model": runtime.config.display_name,
+                "agent": runtime.runtime_name,
+                "tag": tag,
+                "reason": route_reason,
+            }
+        )
+        prompt, remote_session_id = self._agent_prompt(runtime.runtime_name, text)
+        selected = runtime
+        result: AgentResult | None = None
+        try:
+            result = await self._run_agent_runtime(
+                runtime, prompt, remote_session_id, attachments, emit
+            )
+        except AgentCancelled as exc:
+            raise ValueError(str(exc)) from exc
+        except AgentError as primary_error:
+            fallback = self.agent_manager.fallback(runtime.runtime_name)
+            if fallback is not None:
+                emit({"type": "reset"})
+                emit(
+                    {
+                        "type": "status",
+                        "content": f"{runtime.config.display_name} 失败，正在交接给 {fallback.config.display_name}",
+                    }
+                )
+                selected = fallback
+                fallback_prompt, fallback_session = self._agent_prompt(
+                    fallback.runtime_name,
+                    text,
+                    handoff_from=runtime.runtime_name,
+                )
+                try:
+                    result = await self._run_agent_runtime(
+                        fallback,
+                        fallback_prompt, fallback_session, attachments, emit
+                    )
+                except AgentCancelled as exc:
+                    raise ValueError(str(exc)) from exc
+                except AgentError as fallback_error:
+                    logger.warning(
+                        "Agent primary={} fallback={} 均失败: {} / {}",
+                        runtime.runtime_name,
+                        fallback.runtime_name,
+                        primary_error,
+                        fallback_error,
+                    )
+            if result is None:
+                if self.agent_manager.fallback_to_models:
+                    emit({"type": "reset"})
+                    emit(
+                        {
+                            "type": "status",
+                            "content": "Agent 暂不可用，已降级到普通模型路由",
+                        }
+                    )
+                    return False
+                raise ValueError(str(primary_error)) from primary_error
+
+        self._persist_agent_result(selected, text, result)
+        emit(
+            {
+                "type": "done",
+                "model": f"{selected.config.display_name} · {result.model}",
+                "agent": selected.runtime_name,
+                "session_id": self.current_session_id,
+                "agent_session_id": result.session_id,
+                "stats": self.history.daily_report(),
+                "sessions": self.list_sessions(),
+            }
+        )
+        return True
+
+    async def _run_agent_runtime(
+        self,
+        runtime: AgentRuntime,
+        prompt: str,
+        session_id: str | None,
+        attachments: list[Path],
+        emit: EventCallback,
+    ) -> AgentResult:
+        with self._active_agent_lock:
+            self._active_agent = runtime
+        try:
+            return await runtime.run(prompt, session_id, attachments, emit)
+        finally:
+            with self._active_agent_lock:
+                if self._active_agent is runtime:
+                    self._active_agent = None
+
+    def _agent_prompt(
+        self,
+        runtime_name: str,
+        text: str,
+        handoff_from: str | None = None,
+    ) -> tuple[str, str | None]:
+        thread = self.history.get_agent_thread(self.current_session_id, runtime_name)
+        last_message_id = thread.last_message_id if thread else None
+        pending = self.history.messages_after(self.current_session_id, last_message_id)
+        pieces: list[str] = []
+        if pending:
+            transcript = "\n".join(
+                f"{message.role}: {message.content}" for message in pending[-20:]
+            )
+            pieces.append(
+                "这是统一 Agent 网关同步的跨 Agent 会话上下文。"
+                "只把它当作此前对话，不要重复回答：\n" + transcript
+            )
+        if handoff_from:
+            pieces.append(f"上一运行时 {handoff_from} 未完成任务，现在由你接管。")
+        pieces.append("当前用户任务：\n" + text)
+        return "\n\n".join(pieces), thread.remote_session_id if thread else None
+
+    def _persist_agent_result(
+        self,
+        runtime: AgentRuntime,
+        user_text: str,
+        result: AgentResult,
+    ) -> None:
+        label = f"agent:{runtime.runtime_name}/{result.model}"
+        self.memory.add("user", user_text)
+        self.memory.add("assistant", result.answer, model=label)
+        self.history.add_message(self.current_session_id, "user", user_text)
+        assistant = self.history.add_message(
+            self.current_session_id, "assistant", result.answer, model=label
+        )
+        if result.session_id:
+            self.history.save_agent_thread(
+                self.current_session_id,
+                runtime.runtime_name,
+                result.session_id,
+                result.model,
+                assistant.id,
+            )
+        input_tokens = result.usage.get("input_tokens", self._estimate_tokens(user_text))
+        output_tokens = result.usage.get(
+            "output_tokens", self._estimate_tokens(result.answer)
+        )
+        self.history.record_usage(
+            self.current_session_id,
+            label,
+            input_tokens,
+            output_tokens,
+            result.cost,
+        )
 
     async def _fallback(
         self,

@@ -1,16 +1,19 @@
 # LocalAI Agent Router
 
-纯本地运行的多模型 AI Agent 平台 —— 你的个人 AI 调度中心。
+本地运行的统一 Agent 与多模型调度平台 —— 让 Claude Code、Codex 和普通模型按场景自动接力。
 
 > 完整部署说明见 [部署指南](DEPLOYMENT.md)。
 
 ## 项目简介
 
-LocalAI Agent Router 是一个本地运行的多模型 AI Agent 平台，提供浏览器可视化界面和终端界面。系统会根据任务类型自动选择最合适的大语言模型，同时支持完全自定义模型和路由规则。
+LocalAI Agent Router 是一个本地运行的统一 Agent 网关，提供浏览器可视化界面和终端界面。系统可以进入本机已登录的 Claude Code 或 Codex Agent，根据当前对话场景自动选择、恢复各自线程并同步跨 Agent 上下文；Agent 不可用时可降级到普通模型路由。
 
 核心能力：
 
 - 多模型统一接入（DeepSeek / OpenAI / Kimi / 通义千问）
+- Claude Code / Codex 原生 CLI Agent 接入与会话恢复
+- 场景自动路由（编程 → Codex，写作/文档/研究 → Claude）
+- 跨 Agent 上下文交接、失败切换、超时与主动停止
 - 智能 Router 调度（强制模型 → 用户规则 → 自动能力匹配 → 默认模型）
 - 本地 API Key 加密存储（AES-256-GCM）
 - SQLite 对话历史与 Token 统计
@@ -24,6 +27,7 @@ LocalAI Agent Router 是一个本地运行的多模型 AI Agent 平台，提供�
 LocalAI-Agent-Router/
 ├── main.py
 ├── agent/           # 调度器、分析器、规划器、记忆
+├── agents/          # Claude Code / Codex Agent 运行时与统一网关
 ├── providers/       # Provider 接口与实现
 ├── models/          # 模型配置管理
 ├── storage/         # 数据库、加密、历史记录
@@ -114,6 +118,42 @@ API 地址必须使用 HTTPS；只有 `localhost`、`127.0.0.0/8` 和 `::1` 等�
 
 如需手动编辑配置文件，请将 `api_key_encrypted` 留空，通过 CLI 录入密钥。
 
+## Claude / Codex Agent 网关
+
+Agent 网关复用本机 Claude Code 和 Codex CLI 的登录状态，不会读取或复制它们的认证令牌。请先安装并登录至少一个 Agent：
+
+```bash
+codex --version
+codex login status
+claude --version
+claude auth status --json
+```
+
+安装与登录方法以官方文档为准：
+
+- [Codex CLI 与非交互模式](https://learn.chatgpt.com/docs/non-interactive-mode.md)
+- [Claude Code 安装](https://docs.anthropic.com/en/docs/claude-code/getting-started)
+- [Claude Code CLI 参数](https://docs.anthropic.com/en/docs/claude-code/cli-usage)
+
+启动 GUI 后，“Agent 网关”选择器提供：
+
+- `自动 Agent`：按场景自动选择 Claude 或 Codex。
+- `Claude Agent` / `Codex Agent`：强制进入指定 Agent，并恢复该 LocalAI 会话对应的原生线程。
+- `普通模型路由`：不运行 Agent，只使用原有 Chat Completions 模型。
+
+默认路由位于 `config/agents.yaml`：
+
+| 场景 | 默认 Agent |
+| --- | --- |
+| coding / math | Codex |
+| writing / document / translation / research / general | Claude |
+
+Claude 默认使用 `safe_mode: true` 与 `acceptEdits`，禁用项目自定义 hooks/plugins 但保留内置工具；Codex 默认使用 `workspace-write` sandbox，并通过 `safe_mode: true` 忽略用户 `config.toml`（认证仍复用 `CODEX_HOME`）。这样可以减少不受网关控制的 hooks、MCP 和插件副作用。不要在不可信项目中改成 `bypassPermissions` 或 `danger-full-access`。运行中的 Agent 可以点击“停止”终止，超时进程也会自动回收。
+
+当对话从 Claude 切回 Codex（或反向切换）时，网关会恢复目标 Agent 自己的原生 session，并只同步它上次运行后新增的对话，避免重复灌入完整历史。
+
+如果 Claude 状态显示“本地代理未启动”，说明 Claude 用户设置中的 `ANTHROPIC_BASE_URL` 指向本机端口，但对应代理没有监听。请启动该代理，或在 `CLAUDE_CONFIG_DIR/settings.json` 中恢复可用地址；网关只诊断状态，不会擅自修改 Claude 的认证和代理配置。首选 Agent 不健康时，“自动 Agent”会立即交接给另一个可用 Agent，不等待网络重试耗尽。
+
 ## 运行方式
 
 ### 可视化界面（推荐）
@@ -134,7 +174,7 @@ localai-gui
 localai gui --port 9000 --no-browser
 ```
 
-可视化界面提供流式聊天、工作模式与模型切换、模型增删改/连接测试、文件上传、历史会话查看与导出、Token/费用统计。每次启动会生成随机访问令牌，API 只接受本次本机页面的请求。
+可视化界面提供 Claude/Codex Agent 自动切换、切换原因与工具活动展示、流式聊天、工作模式与模型切换、模型增删改/连接测试、文件上传、历史会话查看与导出、Token/费用统计。每次启动会生成随机访问令牌，API 只接受本次本机页面的请求。
 
 ### Windows
 

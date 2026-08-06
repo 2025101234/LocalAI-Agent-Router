@@ -48,7 +48,7 @@
 
       <div class="sidebar-footer">
         <div class="privacy-pill"><span class="status-dot"></span>仅本机可访问</div>
-        <div class="version">v0.2.0 · 127.0.0.1</div>
+        <div class="version">v0.3.0 · 127.0.0.1</div>
       </div>
     </aside>
 
@@ -63,6 +63,10 @@
           <label class="select-wrap">
             <span>工作模式</span>
             <select id="mode-select" aria-label="工作模式"></select>
+          </label>
+          <label class="select-wrap agent-select-wrap">
+            <span>Agent 网关</span>
+            <select id="agent-select" aria-label="Agent 网关"></select>
           </label>
           <label class="select-wrap model-select-wrap">
             <span>路由模型</span>
@@ -81,9 +85,9 @@
                 <div class="hero-core"><span>AI</span></div>
               </div>
               <div class="hero-copy">
-                <span class="hero-badge">LOCAL-FIRST AI ROUTING</span>
-                <h2>把问题交给最合适的模型</h2>
-                <p>所有配置、密钥与对话记录都留在你的设备上。系统会根据任务自动选择模型，也可以随时手动指定。</p>
+                <span class="hero-badge">UNIFIED AGENT GATEWAY</span>
+                <h2>让 Claude 与 Codex 自动接力</h2>
+                <p>系统根据对话场景进入合适的 Agent，并在切换时同步上下文。Agent 不可用时会安全降级到普通模型。</p>
               </div>
               <div class="suggestion-grid">
                 <button class="suggestion" type="button" data-prompt="帮我审查这段代码并指出潜在 Bug">
@@ -107,6 +111,7 @@
           </div>
 
           <div class="composer-zone">
+            <div class="agent-status-bar" id="agent-status-bar"></div>
             <div class="file-chips" id="file-chips"></div>
             <div class="composer">
               <textarea id="message-input" rows="1" maxlength="30000" placeholder="输入消息，Enter 发送，Shift + Enter 换行…"></textarea>
