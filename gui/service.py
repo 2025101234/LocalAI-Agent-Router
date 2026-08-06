@@ -471,6 +471,7 @@ class ApplicationService:
         except AgentCancelled as exc:
             raise ValueError(str(exc)) from exc
         except AgentError as primary_error:
+            self.agent_manager.record_failure(runtime, primary_error)
             fallback = self.agent_manager.fallback(runtime.runtime_name)
             if fallback is not None:
                 emit({"type": "reset"})
@@ -494,6 +495,7 @@ class ApplicationService:
                 except AgentCancelled as exc:
                     raise ValueError(str(exc)) from exc
                 except AgentError as fallback_error:
+                    self.agent_manager.record_failure(fallback, fallback_error)
                     logger.warning(
                         "Agent primary={} fallback={} 均失败: {} / {}",
                         runtime.runtime_name,
@@ -513,6 +515,7 @@ class ApplicationService:
                     return False
                 raise ValueError(str(primary_error)) from primary_error
 
+        self.agent_manager.record_success(selected)
         self._persist_agent_result(selected, text, result)
         emit(
             {

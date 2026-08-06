@@ -430,3 +430,26 @@ def test_manager_skips_unhealthy_preferred_agent(
     assert "自动交接" in reason
     with pytest.raises(ValueError, match="本地代理未启动"):
         manager.select({"writing"}, forced="claude")
+
+
+def test_manager_temporarily_skips_agent_after_auth_failure(
+    temp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_agent_project(temp_dir)
+    monkeypatch.setattr(
+        AgentManager,
+        "RUNTIMES",
+        {"codex": _FakeAgentRuntime, "claude": _FakeAgentRuntime},
+    )
+    manager = AgentManager(temp_dir / "config" / "agents.yaml", temp_dir)
+    claude = manager.runtime("claude")
+    assert claude is not None
+
+    manager.record_failure(claude, AgentError("API Error: 403 Forbidden"))
+    statuses = {item["name"]: item for item in manager.statuses()}
+    selected, reason = manager.select({"writing"})
+
+    assert statuses["claude"]["ready"] is False
+    assert "403" in statuses["claude"]["detail"]
+    assert selected is not None and selected.runtime_name == "codex"
+    assert "自动交接" in reason

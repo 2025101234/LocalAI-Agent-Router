@@ -61,7 +61,7 @@ localai
 先在联网机器下载仓库 Releases 中的 `.whl` 文件和依赖，再复制到目标机器：
 
 ```bash
-python -m pip install localai_agent_router-0.3.0-py3-none-any.whl
+python -m pip install localai_agent_router-0.3.1-py3-none-any.whl
 localai version
 ```
 
@@ -93,6 +93,8 @@ claude auth status --json
 启动界面后保持“Agent 网关 → 自动 Agent”。默认编程/数学进入 Codex，写作/文档/翻译/研究进入 Claude。详细路由、模型、超时和权限位于 `config/agents.yaml`。
 
 Agent 状态只在本机读取。若 Claude 显示本地代理未启动，请检查 `CLAUDE_CONFIG_DIR/settings.json` 中的 `ANTHROPIC_BASE_URL` 及对应监听端口；程序不会自动改写 Claude 的认证令牌或代理设置。
+
+若 Claude 在运行后显示“上游认证失败（403）”，说明本地代理已连通但其供应商凭据被上游拒绝。请在代理管理程序中更新该供应商凭据，或关闭代理接管后执行 `claude auth login` 重新登录。网关会暂时跳过该 Agent，自动改用 Codex 或普通模型。
 
 ```text
 /model update deepseek

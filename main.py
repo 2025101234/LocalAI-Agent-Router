@@ -106,7 +106,7 @@ def gui(
 @app.command()
 def version() -> None:
     """显示版本信息。"""
-    typer.echo("LocalAI Agent Router 0.3.0")
+    typer.echo("LocalAI Agent Router 0.3.1")
 
 
 def main() -> None:

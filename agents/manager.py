@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -24,6 +25,7 @@ class AgentManager:
         self.workspace = workspace
         self.settings: dict[str, Any] = {}
         self.configs: dict[str, AgentConfig] = {}
+        self._runtime_failures: dict[str, tuple[float, str]] = {}
         self.reload()
 
     def reload(self) -> None:
@@ -52,7 +54,7 @@ class AgentManager:
         rows: list[dict[str, Any]] = []
         for config in sorted(self.configs.values(), key=lambda item: item.priority):
             runtime = self.runtime(config.name)
-            status = runtime.status() if runtime else {
+            status = self.status_for(runtime) if runtime else {
                 "name": config.name,
                 "display_name": config.display_name,
                 "runtime": config.name,
@@ -67,6 +69,37 @@ class AgentManager:
             rows.append(status)
         return rows
 
+    def status_for(self, runtime: AgentRuntime) -> dict[str, Any]:
+        """Return CLI status combined with a short-lived runtime failure state."""
+        status = runtime.status()
+        failure = self._runtime_failures.get(runtime.runtime_name)
+        if failure is None:
+            return status
+        retry_at, detail = failure
+        if time.monotonic() >= retry_at:
+            self._runtime_failures.pop(runtime.runtime_name, None)
+            return status
+        status["ready"] = False
+        status["detail"] = detail
+        return status
+
+    def record_failure(self, runtime: AgentRuntime, error: Exception) -> None:
+        """Avoid repeatedly routing users to an Agent that just failed to run."""
+        message = str(error).lower()
+        if "403" in message or "authenticate" in message:
+            detail = (
+                f"{runtime.config.display_name} 上游认证失败（403），"
+                "请更新供应商凭据或重新登录"
+            )
+        elif "not logged in" in message or "未登录" in message:
+            detail = f"{runtime.config.display_name} 未登录，请先完成登录"
+        else:
+            detail = f"{runtime.config.display_name} 上次运行失败，将在 60 秒后自动重试"
+        self._runtime_failures[runtime.runtime_name] = (time.monotonic() + 60, detail)
+
+    def record_success(self, runtime: AgentRuntime) -> None:
+        self._runtime_failures.pop(runtime.runtime_name, None)
+
     def select(self, tags: set[str], forced: str | None = None) -> tuple[AgentRuntime | None, str]:
         if forced == "model":
             return None, "已选择普通模型路由"
@@ -74,7 +107,7 @@ class AgentManager:
             runtime = self.runtime(forced)
             if runtime is None or not runtime.executable():
                 raise ValueError(f"Agent {forced} 未启用或命令不可用")
-            status = runtime.status()
+            status = self.status_for(runtime)
             if not status.get("ready", False):
                 raise ValueError(str(status.get("detail") or f"Agent {forced} 当前不可用"))
             return runtime, "用户手动指定"
@@ -83,7 +116,7 @@ class AgentManager:
         routing = self.settings.get("routing", {})
         preferred = str(routing.get(primary) or "") if isinstance(routing, dict) else ""
         runtime = self.runtime(preferred) if preferred else None
-        if runtime and runtime.status().get("ready", False):
+        if runtime and self.status_for(runtime).get("ready", False):
             return runtime, f"场景 {primary} 自动匹配"
 
         candidates: list[tuple[int, AgentRuntime]] = []
@@ -91,7 +124,7 @@ class AgentManager:
             candidate = self.runtime(config.name)
             if (
                 candidate
-                and candidate.status().get("ready", False)
+                and self.status_for(candidate).get("ready", False)
                 and (tags & set(config.capabilities))
             ):
                 candidates.append((config.priority, candidate))
@@ -102,7 +135,7 @@ class AgentManager:
             candidate
             for config in sorted(self.configs.values(), key=lambda item: item.priority)
             if (candidate := self.runtime(config.name))
-            and candidate.status().get("ready", False)
+            and self.status_for(candidate).get("ready", False)
         ]
         if ready_agents:
             return ready_agents[0], f"场景 {primary} 的首选 Agent 不可用，自动交接"
@@ -118,7 +151,7 @@ class AgentManager:
             (
                 runtime
                 for runtime in candidates
-                if runtime and runtime.status().get("ready", False)
+                if runtime and self.status_for(runtime).get("ready", False)
             ),
             None,
         )
