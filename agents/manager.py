@@ -86,7 +86,12 @@ class AgentManager:
     def record_failure(self, runtime: AgentRuntime, error: Exception) -> None:
         """Avoid repeatedly routing users to an Agent that just failed to run."""
         message = str(error).lower()
-        if "403" in message or "authenticate" in message:
+        if "402" in message or "额度不足" in message or "insufficient quota" in message:
+            detail = (
+                f"{runtime.config.display_name} 上游额度不足（402），"
+                "请充值或切换可用供应商"
+            )
+        elif "403" in message or "authenticate" in message:
             detail = (
                 f"{runtime.config.display_name} 上游认证失败（403），"
                 "请更新供应商凭据或重新登录"

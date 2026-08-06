@@ -473,3 +473,23 @@ def test_manager_surfaces_claude_upstream_timeout(
     status = {item["name"]: item for item in manager.statuses()}["claude"]
     assert status["ready"] is False
     assert "连接超时" in status["detail"]
+
+
+def test_manager_surfaces_agent_quota_failure(
+    temp_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_agent_project(temp_dir)
+    monkeypatch.setattr(
+        AgentManager,
+        "RUNTIMES",
+        {"codex": _FakeAgentRuntime, "claude": _FakeAgentRuntime},
+    )
+    manager = AgentManager(temp_dir / "config" / "agents.yaml", temp_dir)
+    claude = manager.runtime("claude")
+    assert claude is not None
+
+    manager.record_failure(claude, AgentError("API Error: 402 Token 额度不足"))
+
+    status = {item["name"]: item for item in manager.statuses()}["claude"]
+    assert status["ready"] is False
+    assert "额度不足" in status["detail"]
