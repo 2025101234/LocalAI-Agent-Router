@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>LocalAI Agent Router</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark"><span></span><span></span><span></span></div>
+        <div>
+          <strong>LocalAI</strong>
+          <small>Agent Router</small>
+        </div>
+      </div>
+
+      <button class="new-chat" id="new-chat-btn" type="button">
+        <span class="plus">＋</span>
+        <span>新建对话</span>
+        <kbd>Ctrl N</kbd>
+      </button>
+
+      <nav class="main-nav" aria-label="主导航">
+        <button class="nav-item active" data-view="chat" type="button">
+          <span class="nav-icon">◈</span><span>对话</span>
+        </button>
+        <button class="nav-item" data-view="history" type="button">
+          <span class="nav-icon">◷</span><span>历史记录</span>
+        </button>
+        <button class="nav-item" data-view="models" type="button">
+          <span class="nav-icon">⌘</span><span>模型管理</span>
+        </button>
+        <button class="nav-item" data-view="stats" type="button">
+          <span class="nav-icon">⌁</span><span>用量统计</span>
+        </button>
+      </nav>
+
+      <div class="recent-section">
+        <div class="section-label"><span>最近对话</span><button id="refresh-btn" title="刷新" type="button">↻</button></div>
+        <div class="recent-list" id="recent-list"></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="privacy-pill"><span class="status-dot"></span>仅本机可访问</div>
+        <div class="version">v0.2.0 · 127.0.0.1</div>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <button class="mobile-menu" id="mobile-menu" type="button">☰</button>
+        <div class="view-title">
+          <span class="eyebrow">LOCAL WORKSPACE</span>
+          <h1 id="view-heading">智能对话</h1>
+        </div>
+        <div class="topbar-actions">
+          <label class="select-wrap">
+            <span>工作模式</span>
+            <select id="mode-select" aria-label="工作模式"></select>
+          </label>
+          <label class="select-wrap model-select-wrap">
+            <span>路由模型</span>
+            <select id="model-select" aria-label="路由模型"></select>
+          </label>
+          <button class="icon-button" id="theme-btn" title="切换明暗主题" type="button">☼</button>
+        </div>
+      </header>
+
+      <section class="view active" id="view-chat">
+        <div class="chat-stage">
+          <div class="chat-scroll" id="chat-scroll">
+            <div class="empty-state" id="empty-state">
+              <div class="hero-orbit">
+                <div class="orbit-ring"></div>
+                <div class="hero-core"><span>AI</span></div>
+              </div>
+              <div class="hero-copy">
+                <span class="hero-badge">LOCAL-FIRST AI ROUTING</span>
+                <h2>把问题交给最合适的模型</h2>
+                <p>所有配置、密钥与对话记录都留在你的设备上。系统会根据任务自动选择模型，也可以随时手动指定。</p>
+              </div>
+              <div class="suggestion-grid">
+                <button class="suggestion" type="button" data-prompt="帮我审查这段代码并指出潜在 Bug">
+                  <span class="suggestion-icon violet">&lt;/&gt;</span>
+                  <span><strong>代码审查</strong><small>发现 Bug 与安全风险</small></span>
+                  <b>↗</b>
+                </button>
+                <button class="suggestion" type="button" data-prompt="把下面的内容整理成一份结构清晰的报告">
+                  <span class="suggestion-icon cyan">▤</span>
+                  <span><strong>文档整理</strong><small>总结、润色与结构化</small></span>
+                  <b>↗</b>
+                </button>
+                <button class="suggestion" type="button" data-prompt="请解释这个问题，并给出逐步推导过程">
+                  <span class="suggestion-icon amber">∑</span>
+                  <span><strong>分析推理</strong><small>数学与复杂问题拆解</small></span>
+                  <b>↗</b>
+                </button>
+              </div>
+            </div>
+            <div class="message-list" id="message-list"></div>
+          </div>
+
+          <div class="composer-zone">
+            <div class="file-chips" id="file-chips"></div>
+            <div class="composer">
+              <textarea id="message-input" rows="1" maxlength="30000" placeholder="输入消息，Enter 发送，Shift + Enter 换行…"></textarea>
+              <div class="composer-footer">
+                <div class="composer-tools">
+                  <input id="file-input" type="file" multiple hidden accept=".txt,.md,.py,.cpp,.c,.h,.hpp,.java,.js,.ts,.json,.yaml,.yml,.pdf">
+                  <button class="tool-button" id="attach-btn" title="添加附件" type="button">⌕ <span>附件</span></button>
+                  <span class="composer-hint">最多 8 个文件，单个 10 MB / 总计 40 MB</span>
+                </div>
+                <button class="send-button" id="send-btn" type="button"><span>发送</span><b>↑</b></button>
+              </div>
+            </div>
+            <p class="local-note"><span>◆</span> API Key 使用 AES-256-GCM 加密，服务仅监听本机回环地址</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-history">
+        <div class="content-page">
+          <div class="page-heading">
+            <div><span class="eyebrow">CONVERSATIONS</span><h2>历史记录</h2><p>回看本地保存的会话，继续之前的上下文或导出内容。</p></div>
+            <div class="search-box"><span>⌕</span><input id="history-search" placeholder="搜索会话标题或消息"></div>
+          </div>
+          <div class="history-layout">
+            <div class="panel history-list-panel"><div class="history-cards" id="history-cards"></div></div>
+            <div class="panel history-preview" id="history-preview">
+              <div class="preview-placeholder"><span>◷</span><strong>选择一个会话</strong><small>消息内容将在这里显示</small></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="view" id="view-models">
+        <div class="content-page">
+          <div class="page-heading">
+            <div><span class="eyebrow">PROVIDERS</span><h2>模型管理</h2><p>配置云端模型或本地 OpenAI 兼容服务，密钥不会显示在页面中。</p></div>
+            <button class="primary-button" id="add-model-btn" type="button">＋ 添加模型</button>
+          </div>
+          <div class="model-summary" id="model-summary"></div>
+          <div class="model-grid" id="model-grid"></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-stats">
+        <div class="content-page">
+          <div class="page-heading">
+            <div><span class="eyebrow">LOCAL ANALYTICS</span><h2>用量统计</h2><p>Token 与费用估算来自本地数据库，不会上报到任何分析平台。</p></div>
+            <div class="segmented"><button class="active" data-period="daily" type="button">今日</button><button data-period="monthly" type="button">本月</button></div>
+          </div>
+          <div class="metric-grid" id="metric-grid"></div>
+          <div class="panel stats-panel">
+            <div class="panel-heading"><div><strong>模型明细</strong><small id="stats-period-label"></small></div><span class="privacy-pill"><span class="status-dot"></span>本地统计</span></div>
+            <div class="table-wrap"><table><thead><tr><th>模型</th><th>输入 Token</th><th>输出 Token</th><th>调用次数</th><th>预估费用</th></tr></thead><tbody id="stats-table"></tbody></table></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="model-modal" aria-hidden="true">
+    <div class="modal model-modal-card" role="dialog" aria-modal="true" aria-labelledby="model-modal-title">
+      <div class="modal-header"><div><span class="eyebrow">MODEL CONFIG</span><h3 id="model-modal-title">添加模型</h3></div><button class="close-button" data-close="model-modal" type="button">×</button></div>
+      <form id="model-form">
+        <div class="form-grid">
+          <label><span>模型别名</span><input name="name" required maxlength="64" placeholder="例如 my-openai"></label>
+          <label><span>Provider</span><select name="provider"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="kimi">Kimi</option><option value="qwen">Qwen</option></select></label>
+          <label class="span-2"><span>API 地址</span><input name="base_url" required placeholder="https://api.example.com/v1"></label>
+          <label><span>模型标识</span><input name="model" required placeholder="模型 ID"></label>
+          <label><span>优先级</span><input name="priority" type="number" min="0" value="100"></label>
+          <label class="span-2"><span>API Key <small>编辑时留空表示不修改</small></span><input name="api_key" type="password" autocomplete="new-password" placeholder="仅在本机加密保存"></label>
+          <label class="span-2"><span>能力标签</span><input name="capabilities" placeholder="coding, writing, translation"></label>
+          <label><span>输入费用 / 1K Token</span><input name="cost_input" type="number" min="0" step="0.000001" value="0"></label>
+          <label><span>输出费用 / 1K Token</span><input name="cost_output" type="number" min="0" step="0.000001" value="0"></label>
+        </div>
+        <label class="toggle-row"><input name="enabled" type="checkbox" checked><span class="toggle-switch"></span><span><strong>启用模型</strong><small>启用后可参与自动路由和 fallback</small></span></label>
+        <div class="modal-actions"><button class="secondary-button" data-close="model-modal" type="button">取消</button><button class="primary-button" type="submit">保存配置</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="vault-modal" aria-hidden="true">
+    <div class="modal vault-modal-card" role="dialog" aria-modal="true" aria-labelledby="vault-title">
+      <div class="vault-visual">◇<span>●</span></div>
+      <span class="eyebrow">LOCAL VAULT</span>
+      <h3 id="vault-title">解锁本地密钥库</h3>
+      <p id="vault-description">系统凭据管理器不可用，请输入本地主密码。密码只保留在当前进程内存中。</p>
+      <form id="vault-form">
+        <label><span>本地主密码</span><input name="password" type="password" minlength="12" required autocomplete="current-password"></label>
+        <label id="vault-confirm-row"><span>再次输入</span><input name="confirmation" type="password" minlength="12" autocomplete="new-password"></label>
+        <button class="primary-button full" type="submit">安全解锁</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-stack" id="toast-stack" aria-live="polite"></div>
+  <script src="/app.js" defer></script>
+</body>
+</html>

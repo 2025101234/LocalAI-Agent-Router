@@ -1,6 +1,6 @@
 # 部署指南
 
-LocalAI Agent Router 是交互式命令行程序，不需要 Web 服务器、反向代理或常驻守护进程。安装 Python 包后运行 `localai` 即可。
+LocalAI Agent Router 是本地交互程序，不需要公网 Web 服务器、反向代理或常驻守护进程。安装后可运行 `localai gui` 使用可视化界面，也可运行 `localai` 使用终端界面。
 
 ## 1. 环境要求
 
@@ -17,7 +17,7 @@ python -m pip install --user pipx
 python -m pipx ensurepath
 pipx install "git+https://github.com/2025101234/LocalAI-Agent-Router.git"
 localai version
-localai
+localai gui
 ```
 
 升级：
@@ -73,7 +73,13 @@ python -m pip wheel . --no-deps --wheel-dir dist
 
 ## 5. 首次配置
 
-启动程序后更新一个内置模型：
+推荐先启动可视化界面：
+
+```bash
+localai gui
+```
+
+在“模型管理”中编辑内置模型、录入 API Key 并点击“测试连接”。也可在终端界面更新一个内置模型：
 
 ```text
 /model update deepseek
@@ -129,7 +135,7 @@ localai
 
 ```bash
 localai version
-localai
+localai gui --no-browser
 ```
 
 进入程序后依次执行：

@@ -170,6 +170,19 @@ class SecureVault:
             self._key = self._load_or_create_key()
         return self._key
 
+    def unlock(self, password: str) -> None:
+        """使用主密码解锁或初始化本地主密钥，不保留失败的密码。"""
+        previous_password = self._master_password
+        previous_key = self._key
+        self._master_password = password
+        self._key = None
+        try:
+            _ = self.key
+        except Exception:
+            self._master_password = previous_password
+            self._key = previous_key
+            raise
+
     def encrypt(self, plaintext: str) -> str:
         """加密字符串，返回 base64 编码的密文。"""
         if not isinstance(plaintext, str):

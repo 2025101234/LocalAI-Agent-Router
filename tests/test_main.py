@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from typer.testing import CliRunner
+
 import main
 
 
@@ -15,6 +17,11 @@ def test_explicit_project_directory(temp_dir: Path) -> None:
     selected = temp_dir / "custom"
 
     assert main.resolve_project_dir(selected) == selected.resolve()
+    assert {path.name for path in (selected / "config").iterdir()} == {
+        "models.yaml",
+        "modes.yaml",
+        "rules.yaml",
+    }
 
 
 def test_installed_layout_copies_config_templates(
@@ -35,3 +42,11 @@ def test_installed_layout_copies_config_templates(
 
     assert result == user_data / "localai-agent-router"
     assert (result / "config" / "models.yaml").exists()
+
+
+def test_gui_command_is_exposed() -> None:
+    result = CliRunner().invoke(main.app, ["gui", "--help"])
+
+    assert result.exit_code == 0
+    assert "可视化界面" in result.output
+    assert "--no-browser" in result.output

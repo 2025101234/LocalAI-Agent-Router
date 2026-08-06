@@ -6,7 +6,7 @@
 
 ## 项目简介
 
-LocalAI Agent Router 是一个纯终端运行的多模型 AI Agent 平台。用户只需通过终端与 Agent 交互，系统会根据任务类型自动选择最合适的大语言模型，同时支持完全自定义模型和路由规则。
+LocalAI Agent Router 是一个本地运行的多模型 AI Agent 平台，提供浏览器可视化界面和终端界面。系统会根据任务类型自动选择最合适的大语言模型，同时支持完全自定义模型和路由规则。
 
 核心能力：
 
@@ -16,6 +16,7 @@ LocalAI Agent Router 是一个纯终端运行的多模型 AI Agent 平台。用�
 - SQLite 对话历史与 Token 统计
 - 自动 Fallback 与文件分析
 - 工作模式系统（coder / writer / translator / researcher）
+- 本地浏览器可视化界面（聊天、模型、历史、统计、附件）
 
 ## 目录结构
 
@@ -114,6 +115,26 @@ API 地址必须使用 HTTPS；只有 `localhost`、`127.0.0.0/8` 和 `::1` 等�
 如需手动编辑配置文件，请将 `api_key_encrypted` 留空，通过 CLI 录入密钥。
 
 ## 运行方式
+
+### 可视化界面（推荐）
+
+```bash
+localai gui
+```
+
+程序只监听 `127.0.0.1`，启动后会自动打开浏览器。也可以使用独立入口：
+
+```bash
+localai-gui
+```
+
+指定端口或禁止自动打开浏览器：
+
+```bash
+localai gui --port 9000 --no-browser
+```
+
+可视化界面提供流式聊天、工作模式与模型切换、模型增删改/连接测试、文件上传、历史会话查看与导出、Token/费用统计。每次启动会生成随机访问令牌，API 只接受本次本机页面的请求。
 
 ### Windows
 
